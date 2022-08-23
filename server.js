@@ -5,6 +5,7 @@ const Account = require('./models/Account')
 const Expense = require('./models/Expense')
 const mysql = require('./config')
 const User = require('./models/User');
+const { log } = require('console');
 
 let expenses = []
 
@@ -74,8 +75,32 @@ app.post('/users', (req, res) => {
                     })
                 }
             }
-
         })
     })
 })
+
+app.get('/login', (req, res) => {
+
+    const { login, senha } = req.body
+
+    mysql.getConnection((error, conn) => {
+        conn.query('SELECT * FROM users WHERE login = ?;', [login], async (error, result) => {
+            if (error) { res.json(error) }
+            try {
+                const match = await bcrypt.compare(senha, result[0].senha)
+                if (match) {
+                    res.json({ mensagem: 'Logado com sucesso' })
+                } else {
+                    res.json({ mensagem: 'senha invalida' })
+                }
+            } catch (error) {
+                res.json('usuario nao encontrado')
+            }
+        })
+    })
+
+
+})
+
+
 app.listen(9999, console.log('Conectado'))
