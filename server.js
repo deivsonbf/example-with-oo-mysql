@@ -1,9 +1,10 @@
 const app = require('./app')
 require('dotenv').config();
+const bcrypt = require('bcrypt')
 const Account = require('./models/Account')
 const Expense = require('./models/Expense')
 const mysql = require('./config')
-const User = require('./models/User')
+const User = require('./models/User');
 
 let expenses = []
 
@@ -32,7 +33,6 @@ app.patch('/expenses/:id', (req, res) => {
     res.json(expense)
 })
 
-
 app.get('/users', (req, res) => {
     mysql.getConnection((error, conn) => {
         if (error) res.json(error)
@@ -45,22 +45,37 @@ app.get('/users', (req, res) => {
 })
 
 app.post('/users', (req, res) => {
-
     const { login, senha } = req.body
-
-    console.log(login + ' ' + senha);
-
-    const user = new User(login, senha)
+    let salt = bcrypt.genSaltSync(process.env.SALT)
+    let cryptedPass = bcrypt.hashSync(senha, salt)
+    const user = new User(login, cryptedPass)
 
     mysql.getConnection((error, conn) => {
         if (error) res.json(error)
-        conn.query('INSERT INTO users (login , senha) values (? , ?)', [user.login, user.senha], (error, result) => {
-            conn.release()
+        conn.query('SELECT * FROM users WHERE login = ?;', [user.login], (error, resultset) => {
             if (error) res.json(error)
-            res.json(result)
+            try {
+                if ((user.login === resultset[0].login)) {
+                    conn.release()
+                    res.json('Nome de usuário já existe')
+                }
+            } catch (error) {
+                if (!user.login) {
+                    res.json("Nao pode ser vazio")
+                } else {
+                    conn.query(`INSERT INTO users (login , senha)  values (? , ?)`, [user.login, user.senha], (error, result) => {
+                        conn.release()
+                        if (error) { res.json(error) }
+                        res.json(
+                            {
+                                mensagem: 'Cadastrado com sucesso!',
+                                id: result.insertId
+                            })
+                    })
+                }
+            }
+
         })
     })
 })
-
-
 app.listen(9999, console.log('Conectado'))
